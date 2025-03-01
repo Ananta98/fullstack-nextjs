@@ -2,26 +2,32 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { db } from '@/lib/db'
 import { linksTable } from '@/lib/db/schema'
-import { desc, eq, isNull } from 'drizzle-orm'
+import { sql, eq } from 'drizzle-orm'
 
 type Response = {
-  id: number
-  title: string
-  url: string
-  created_at: Date | null
-  updated_at: Date | null
-  deleted_at: Date | null
+  deletedId?: number
+  message?: string
 }
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ data: Response[] }>,
 ) {
+  if (req.method != 'DELETE') {
+    res.status(405).json({
+      data: [
+        {
+          message: 'Method not allowd',
+        },
+      ],
+    })
+  }
+
   const data = await db
-    .select()
-    .from(linksTable)
-    .where(isNull(linksTable.deleted_at))
-    .orderBy(desc(linksTable.updated_at))
+    .update(linksTable)
+    .set({ deleted_at: sql`NOW()` })
+    .where(eq(linksTable.id, Number(req.query.id)))
+    .returning({ deletedId: linksTable.id })
 
   res.status(200).json({ data })
 }

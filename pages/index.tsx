@@ -5,133 +5,119 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
-import { z } from 'zod'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
-import useSWR from 'swr'
-
-const formSchema = z.object({
-  title: z.string().min(1),
-  url: z.string().min(1),
-})
+import { Drawer, DrawerContent } from '@/components/ui/drawer'
+import useSWR, { mutate } from 'swr'
+import FormContainer from '@/container/FormContainer'
+import { useState, useRef } from 'react'
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json())
 
 export default function Home() {
-  const { data: dataLinks } = useSWR(`/api/links`, fetcher)
-  const [loading, setLoading] = useState<boolean>(false)
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: '',
-      url: '',
-    },
+  const popoverRef = useRef<HTMLButtonElement | null>(null)
+  const [showEdit, setShowEdit] = useState<boolean>(false)
+  const [valueEdit, setShowValueEdit] = useState<{
+    id: number
+    title: string
+    url: string
+  }>({
+    id: 0,
+    title: '',
+    url: '',
   })
+  const { data: dataLinks, isLoading } = useSWR(`/api/links`, fetcher)
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoading(true)
+  const handleDelete = async (id: number) => {
     try {
-      const response = await fetch('/api/links/create', {
-        method: 'POST',
-        body: JSON.stringify(values),
+      await fetch(`/api/links/delete/${id}`, {
+        method: 'DELETE',
       })
+      mutate(`/api/links`)
     } catch (error) {
     } finally {
-      setLoading(false)
+      popoverRef.current?.click()
     }
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Form Create Link</CardTitle>
-          <CardDescription>Submit your link here</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="title ..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="url ..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Loading ...' : 'Submit'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-      {loading && <p>Loading ...</p>}
-      {dataLinks?.data?.map((link) => (
-        <Card id={link.id}>
-          <CardContent className="flex justify-between">
-            <a href={link.url} target="_blank">
-              {link.title}
-            </a>
-            <Drawer>
-              <DrawerTrigger>Edit</DrawerTrigger>
-              <DrawerContent>
-                <DrawerHeader>
-                  <DrawerTitle>Are you absolutely sure?</DrawerTitle>
-                  <DrawerDescription>
-                    This action cannot be undone.
-                  </DrawerDescription>
-                </DrawerHeader>
-                <DrawerFooter>
-                  <Button>Submit</Button>
-                  <DrawerClose>
-                    <Button variant="outline">Cancel</Button>
-                  </DrawerClose>
-                </DrawerFooter>
-              </DrawerContent>
-            </Drawer>
+    <>
+      <div className="grid grid-cols-1 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Form Create Link</CardTitle>
+            <CardDescription>Submit your link here</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FormContainer />
           </CardContent>
         </Card>
-      ))}
-    </div>
+        {isLoading && <p>Loading ...</p>}
+        {dataLinks?.data?.map((link) => (
+          <Card id={link.id}>
+            <CardContent className="flex justify-between">
+              <a href={link.url} target="_blank">
+                {link.title}
+              </a>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowEdit(true)
+                    setShowValueEdit({
+                      id: link.id,
+                      title: link.title,
+                      url: link.url,
+                    })
+                  }}
+                >
+                  Edit
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button size="sm" variant="destructive">
+                      Delete
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <p>Are you sure for delete this data ?</p>
+                    <Button
+                      size={'sm'}
+                      onClick={() => {
+                        handleDelete(link.id)
+                      }}
+                    >
+                      Yes
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Drawer open={showEdit} onOpenChange={setShowEdit}>
+        <DrawerContent>
+          <div className="container mx-auto p-4">
+            <FormContainer
+              id={valueEdit.id}
+              values={{
+                title: valueEdit.title,
+                url: valueEdit.url,
+              }}
+              onFinished={() => {
+                setShowEdit(false)
+                mutate(`/api/links`)
+              }}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
   )
 }
