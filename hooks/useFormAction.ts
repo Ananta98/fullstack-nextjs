@@ -11,7 +11,7 @@ export const formSchema = z.object({
 export type formType = z.infer<typeof formSchema>
 
 export default function useFormAction({ values }: { values?: formType }) {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<formType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',

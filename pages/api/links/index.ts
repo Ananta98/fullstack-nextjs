@@ -2,7 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { db } from '@/lib/db'
 import { linksTable } from '@/lib/db/schema'
-import { desc, eq, isNull } from 'drizzle-orm'
+import { desc, and, eq, isNull } from 'drizzle-orm'
+import { getToken } from 'next-auth/jwt'
 
 type Response = {
   id: number
@@ -17,10 +18,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ data: Response[] }>,
 ) {
+  const session = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+
   const data = await db
     .select()
     .from(linksTable)
-    .where(isNull(linksTable.deleted_at))
+    .where(
+      and(
+        isNull(linksTable.deleted_at),
+        eq(linksTable.email, String(session?.email)),
+      ),
+    )
     .orderBy(desc(linksTable.updated_at))
 
   res.status(200).json({ data })

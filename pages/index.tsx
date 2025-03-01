@@ -15,12 +15,17 @@ import { Drawer, DrawerContent } from '@/components/ui/drawer'
 import useSWR, { mutate } from 'swr'
 import FormContainer from '@/container/FormContainer'
 import { useState, useRef } from 'react'
+import { getToken } from 'next-auth/jwt'
+import { signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json())
 
 export default function Home() {
+  const session = useSession()
   const popoverRef = useRef<HTMLButtonElement | null>(null)
   const [showEdit, setShowEdit] = useState<boolean>(false)
+  const [showCreate, setShowCreate] = useState<boolean>(false)
   const [valueEdit, setShowValueEdit] = useState<{
     id: number
     title: string
@@ -47,15 +52,14 @@ export default function Home() {
   return (
     <>
       <div className="grid grid-cols-1 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Form Create Link</CardTitle>
-            <CardDescription>Submit your link here</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FormContainer />
-          </CardContent>
-        </Card>
+        <div className="container">
+          <h1 className="text-xl font-bold">{`Hello ${session.data?.user?.name}`}</h1>
+          <p>This is an area to create links, edit and delete links</p>
+          <Button onClick={() => signOut()}>Sign Out</Button>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={() => setShowCreate(true)}>Add Link</Button>
+        </div>
         {isLoading && <p>Loading ...</p>}
         {dataLinks?.data?.map((link) => (
           <Card id={link.id}>
@@ -101,6 +105,18 @@ export default function Home() {
           </Card>
         ))}
       </div>
+      <Drawer open={showCreate} onOpenChange={setShowCreate}>
+        <DrawerContent>
+          <div className="container mx-auto p-4">
+            <FormContainer
+              onFinished={() => {
+                setShowCreate(false)
+                mutate(`/api/links`)
+              }}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
       <Drawer open={showEdit} onOpenChange={setShowEdit}>
         <DrawerContent>
           <div className="container mx-auto p-4">
@@ -120,4 +136,20 @@ export default function Home() {
       </Drawer>
     </>
   )
+}
+
+export const getServerSideProps = async (context: any) => {
+  const token = await getToken({
+    req: context.req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
+  if (!token) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+  return { props: {} }
 }
